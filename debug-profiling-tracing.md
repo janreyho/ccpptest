@@ -6,7 +6,7 @@
 
 所有的调试、性能分析和跟踪工具都依赖于某种 逻辑注入(instrumentation) 机制，注入可以是静态的 (编译期发生) 也可以是动态的 (运行期发生)
 
-## C/C++调试工具
+## 1  C/C++调试工具
 
 ### 实现原理
 
@@ -183,3 +183,163 @@ valgrind --tool=exp-sgcheck <exec>
 ```
 
 Valgrind 版本较低时应将 exp-sgcheck 换为 exp-ptrcheck
+
+#### 静态注入机制
+
+- 工具并非万能，部分场景下需要开发人员给予提示信息帮助检查，Valgrind 提供若干 Client Request 宏，能够在目标程序中静态注入代码，以便在运行时向 Valgrind 及其插件报告有用信息
+- Client Request 静态注入的代码开销很小 (每个注入点 20 余条整数操作指令)，通常不影响目标程序性能
+- 更多对 Client Request 静态注入宏的说明请参考:
+  - Valgrind User Manual 中标题含有 Client Request 字样的章节
+  - 头文件 valgrind/{valgrind.h, memcheck.h, callgrind.h,helgrind.h, drd.h} 中的相关注释
+
+演示代码: https://github.com/chaoslawful/TIP/tree/master/tip1-examples/vg-callreq
+
+### 调试原则
+
+- 发布编译时要产生调试符号 (-g/-g3)，线上部署时要保证原始包和 debuginfo 包都存在且版本相符，不要自找麻烦!
+- 通常来说所有程序都应通过 Valgrind 的 memcheck/sgcheck 检查，以消除绝大部分内存访问问题;
+
+
+- 多线程程序应通过 Valgrind 的 helgrind/DRD 检查，以消除一般的竟态错误;
+
+
+- Valgrind massif 插件可用来排查非预期的堆分配操作源头;
+- 自定义内存分配器/线程同步机制时应主动添加 Valgrind ClientRequest 宏，以帮助检查问题;、
+- GDB 可用来手工排查代码中的逻辑错误;但多进程/多线程程序用 GDB 调试非常麻烦，多数情况下用跟踪工具跟踪此类程序的行为寻找问题来源要更方便、快捷;
+
+## 2  性能分析工具
+
+### 实现原理
+
+- 基于事件 (Event) 的性能分析为特定事件增加回调，记录事件发生次数
+
+
+- 基于采样 (Sampling) 的性能分析
+  - 构造以一定周期重复的触发器用来采样
+  - 在触发器中记录当前代码位置及调用栈
+  - 根据记录数据生成统计性报表结果
+
+注意:性能分析工具通常无法揭示睡眠 (主动睡眠、锁等待、...)或 I/O(socket 访问、磁盘访问、...) 耗时，但这 2 个耗时往往是实际应用程序 主要的视在性能瓶颈 !故需要根据具体应用场景决定是否使用性能分析工具。
+
+### 基于事件
+
+#### gcov
+
+#### callgrind
+
+### 基于采样
+
+#### gprof
+
+#### google-perftools/CPU Profiler
+
+#### oprofile
+
+#### perf
+
+### 程序性能分析原则
+
+- 在进行性能分析前，首先确定目标程序运行时特性，time 命令输出的 sys/usr/wall time 可以帮助我们简单地进行判断:
+  - sys+usr ~ wall 时，目标程序是 CPU 密集型应用
+    - sys >> usr - 尝试减少系统调用次数，或使用系统级性能分析工具
+    - sys << usr - 使用用户态性能分析工具
+  - sys+usr << wall 时，目标程序并未执行太多代码，不要考虑使用通用性能分析工具，此时用户态跟踪工具往往能更好地帮助你
+- 进行性能分析并解析报告结果时应层次化进行，先从最外层入手，逐层深入寻找瓶颈，避免无目的地深入底层细节
+- 性能瓶颈要逐个解决，首先处理已知的最大瓶颈，解决完毕后再重新进行性能分析并处理下一个最大的瓶颈
+
+## 3  跟踪工具
+
+### 实现原理
+
+- 解耦事件的记录和导出操作:环形缓冲区 (ring buffer)
+- 用户态跟踪
+  - 侵入式: 修改用户代码添加对跟踪 API 的调用，需要重新编译非侵入式:
+    - ptrace 系统调用 (man ptrace)
+    - GNU 动态链接器的 LD_AUDIT 支持 (man rtld-audit)
+    - utrace 内核补丁 (>=3.5 版本的内核内置了 uprobes 机制替代utrace 补丁)
+
+
+- 内核态跟踪
+  - 动态机制: kprobes / jprobes / kretprobes，通过 trap 或 short-jmp指令实现
+  - 静态机制
+    - tracepoints: 实质为手工插入的条件跳转
+    - ftrace(>=2.6.26版本的内核):利用gcc注.入. .m.c.o.u.nt. .函. .数.调. .用. 		
+
+### 基于 ptrace 
+
+#### strace
+
+#### ltrace
+
+#### 缺陷
+
+### 基于 LD_AUDIT 机制
+
+#### latrace
+
+### 基于 ftrace 框架
+
+#### trace-cmd
+
+### 复合跟踪工具 
+
+#### SystemTap
+
+#### LTTng 2.0
+
+#### DTrace
+
+### 跟踪原则
+
+- 警告! 跟踪并分析程序行为需要牵扯大量精力，同时可能需要对Linux 内核有一定了解。实际跟踪之前，先好好了解目标程序如何工作，确定跟踪的重点再动手!
+- 仅进行用户态跟踪时，大部分场合下 strace / ltrace 就能满足需要了
+- 需要进行内核态 / 用户态混合跟踪时，在 RedHat 系或其他内核有 utrace 补丁的发行版中可用 SystemTap;在 MacOS / FreeBSD下可用 DTrace
+- 若能修改代码插入跟踪调用，且对跟踪开销非常敏感时，可以选择LTTng 2.0
+
+​		
+​					
+​			
+​		
+​						
+​				
+​			
+​		
+​					
+​			
+​		
+​						
+​				
+​			
+​		
+​					
+​			
+​		
+​	
+
+​			
+​		
+​	
+
+​				
+​			
+​		
+​					
+​			
+​		
+​					
+​			
+​		
+​					
+​			
+​		
+​	
+
+
+​				
+​			
+​		
+​						
+​				
+​			
+​		
+​	
