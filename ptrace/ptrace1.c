@@ -1,9 +1,9 @@
+#include <stdio.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <linux/user.h>   /* For constants
-                                   ORIG_EAX etc */
+#include <sys/reg.h>   /* For constants ORIG_EAX etc */
 int main()
 {
    pid_t child;
@@ -16,7 +16,7 @@ int main()
     else {
         wait(NULL);
         orig_eax = ptrace(PTRACE_PEEKUSER,
-                          child, 4 * ORIG_EAX,
+                          child, 4 * orig_eax,
                           NULL);
         printf("The child made a "
                "system call %ld ", orig_eax);
