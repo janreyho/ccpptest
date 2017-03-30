@@ -16,7 +16,7 @@ int main()
     else {
         wait(NULL);
         orig_eax = ptrace(PTRACE_PEEKUSER,
-                          child, 4 * orig_eax,
+                          child, 4 * ORIG_RAX,
                           NULL);
         printf("The child made a "
                "system call %ld ", orig_eax);

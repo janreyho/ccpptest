@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -23,19 +24,19 @@ int main()
           if(WIFEXITED(status))
               break;
           orig_eax = ptrace(PTRACE_PEEKUSER,
-                     child, 4 * ORIG_EAX, NULL);
+                     child, 4 * RCX, NULL);
           if(orig_eax == SYS_write) {
              if(insyscall == 0) {
                 /* Syscall entry */
                 insyscall = 1;
                 params[0] = ptrace(PTRACE_PEEKUSER,
-                                   child, 4 * EBX,
+                                   child, 4 * R15,
                                    NULL);
                 params[1] = ptrace(PTRACE_PEEKUSER,
-                                   child, 4 * ECX,
+                                   child, 4 * R14,
                                    NULL);
                 params[2] = ptrace(PTRACE_PEEKUSER,
-                                   child, 4 * EDX,
+                                   child, 4 * R13,
                                    NULL);
                 printf("Write called with "
                        "%ld, %ld, %ld ",
@@ -44,7 +45,7 @@ int main()
                 }
           else { /* Syscall exit */
                 eax = ptrace(PTRACE_PEEKUSER,
-                             child, 4 * EAX, NULL);
+                             child, 4 * R11, NULL);
                     printf("Write returned "
                            "with %ld ", eax);
                     insyscall = 0;
